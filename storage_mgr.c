@@ -48,3 +48,13 @@ int main() // testing to see if the function creates a file
     }
     return 0;
 }
+
+/******************************** READ OPERATIONS FOR A SPECIFIC PAGE FROM FILE ON TO A MEMORY ******************************/
+// readBlock will read the block at position pageNum which is pre-defined
+extern RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage){
+    // memPage parameter is a pointer to a block of memory where data read from the file will be stored.
+    // *fhandle -> Pointer to an instance of SM_FileHandle
+    
+    //First, we'll have to verify that the pageNum is non-negative and it does not exceed the total number of pages 
+    
+}
