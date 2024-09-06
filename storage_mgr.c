@@ -1,60 +1,86 @@
-#include <sys/stat.h> // Header file that includes functions and macros related to file attributes and file status.
-#include "storage_mgr.h"
+#include "storage_mgr.h" //Adding header file for the interface
+#include "dberror.h" //Error code header file
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-RC createPageFile (char *filename)
-{
-    FILE *file;
-	int i;
-	char response;
-	file = fopen(filename, "r"); //opens the file to read.
-	
-    if(file != NULL) // If the file exists, it will be opened. If not, fopen returns NULL
-    {
-        printf("File Already Exists!! \n Do you want to Over-Write the file (Y/N): ");
-        scanf("%c",&response);
-        fclose(file);
+
+//Initially, we have to initialize the storage manager
+extern void initStorageManager(void){
+    printf("The storage manager is initialized!!");
+}
+
+/*********************** FILE OPERATIONS *********************/
+
+//Creating a page file
+extern RC createPageFile (char *fileName){
+    FILE *fileopen = fopen(fileName, "w"); //Opening the file to write
+    //We have to check if the file is open or not
+    if(fileopen == NULL){
+        return RC_FILE_NOT_FOUND;   //If not openeed, return ERROR
     }
 
-    if(response == 'Y' || file == NULL)
-    {
-        file = fopen(filename, "w"); // opens the file to write 
-        fseek(file , 0 , SEEK_SET); // seeking the start of the file
-    
-        for(i = 0; i < PAGE_SIZE; i++)
-        {
-            fwrite("\0",1, 1,file);
-            fseek(file,0,SEEK_END);
-        }
-        
+    //Create an empty page and allocate some memory for one page
+    char *newpage = (char *)calloc(PAGE_SIZE, sizeof(char));
+    //In case the memory is not allocated, 
+    if(!newpage){
+        fclose(fileopen);
+        return RC_WRITE_FAILED;
+    }
+
+    //Now, we check if writing is possible in the empty page
+    //SYNTAX of fwrite ->  size_t fwrite(const void *ptr, size_t size, size_t count, FILE *stream);
+    size_t write_code = fwrite(newpage, sizeof(char), PAGE_SIZE, fileopen);
+
+    //CHECK IF THE WRITE OPERATION SUCCEEDED
+    if(write_code != PAGE_SIZE){
+        free(newpage); //Freeing the allocated memory
+        fclose(fileopen);  //CLOSE THE FILE
+        return RC_WRITE_FAILED;
+    }
+
+    //FREE ALL THE ALLOCATED MEMRY after writing
+    free(newpage);
+    fclose(fileopen);
+    return RC_OK;
+}
+
+//OPEN AN EXISTING PAGE FILE
+extern RC openPageFile (char *fileName, SM_FileHandle *fHandle){
+    FILE *file = fopen(fileName, "r+");  //Opening file for reading and writing
+    if(file == NULL){
+        return RC_FILE_NOT_FOUND;
+    }
+    //Set file handle field to store information about file
+    //in the SM_FileHandle
+    fHandle-> fileName = fileName; //Storing file name
+    fHandle-> curPagePos = 0; //Setting the current page to 1st page
+
+    //We can calculate the total number of pages in the file by getting file size
+    fseek(file, 0L, SEEK_END); //Moving to end of the file
+    long fileSize = ftell(file); //Get size of the file
+    fHandle -> totalNumPages = (int) (fileSize/PAGE_SIZE);
+
+    fHandle->mgmtInfo = file;
+    return RC_OK;
+
+}
+
+//CLOSING AN OPEN PAGE
+extern RC closePageFile (SM_FileHandle *fHandle){
+    FILE *closefile = (FILE *)fHandle ->mgmtInfo; //getting the file pointer from mgmtInfo
+    if(fclose(closefile) == 0){                   //Close the file in the condition itselg
         return RC_OK;
     }
-    else
-    {
-        return RC_FILE_PRESENT;
+    else{
+        closefile = NULL;
     }
-
 }
 
-int main() // testing to see if the function creates a file
-{ 
-    RC result = createPageFile("fileONE.txt");
-    if (result == RC_OK) {
-        printf("File created successfully.\n");
-    } else if (result == RC_FILE_PRESENT) {
-        printf("File already exists and was not overwritten.\n");
-    } else {
-        printf("An error occurred.\n");
+//Destroying a page file
+extern RC destroyPageFile (char *fileName){
+    if(remove(fileName) == 0){
+        return RC_OK;
     }
-    return 0;
 }
 
-/******************************** READ OPERATIONS FOR A SPECIFIC PAGE FROM FILE ON TO A MEMORY ******************************/
-// readBlock will read the block at position pageNum which is pre-defined
-extern RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage){
-    // memPage parameter is a pointer to a block of memory where data read from the file will be stored.
-    // *fhandle -> Pointer to an instance of SM_FileHandle
-    
-    //First, we'll have to verify that the pageNum is non-negative and it does not exceed the total number of pages 
-    
-}
