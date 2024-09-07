@@ -84,3 +84,33 @@ extern RC destroyPageFile (char *fileName){
     }
 }
 
+/*********************** READ OPERATIONS *********************/
+extern RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage){
+    //Initially, checking if the page number is valid:
+    if(pageNum<0 || pageNum > fHandle->totalNumPages ){
+        //If page doesn't exist
+        return RC_READ_NON_EXISTING_PAGE;
+    }
+    //Creating a pointer for file using the additional information
+    FILE *readblockfile = (FILE *)fHandle->mgmtInfo;
+    //Steps => Get the File from fHandle -> Seek the page block using offset
+    long offset = pageNum * PAGE_SIZE;
+    //Move the pointer to current page
+    int seek_pointer = fseek(readblockfile, offset, SEEK_SET);
+    if(seek_pointer!=0){
+        return RC_READ_NON_EXISTING_PAGE;
+    }
+    //Goal: Read a specific page from a file into memory
+    size_t read = fread(memPage, sizeof(char), PAGE_SIZE, readblockfile);
+    //SYNTAX: FREAD(VOID *PTR(destination where data is stored), 
+    // SIZE_T SIZE (size of element to read), 
+    // SIZE_T COUNT(number of elements to read), 
+    // FILE *STREAM (file pointer from which data will be read))
+    if(read<PAGE_SIZE){
+        return RC_READ_NON_EXISTING_PAGE;
+    }
+    // Updatr the current page position to this page
+    fHandle->curPagePos = pageNum;
+    return RC_OK;
+
+}
