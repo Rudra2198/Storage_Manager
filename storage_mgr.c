@@ -114,3 +114,16 @@ extern RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage)
     return RC_OK;
 
 }
+
+/*getBlockPos's responsibility to get the page's position from a file*/
+extern int getBlockPos (SM_FileHandle *fHandle){
+    //Constraints: Check if the files are present in the fHandle data structure and
+    // Check if the current page is in a valid range i.e. between 0 and the total number of pages.
+    if(fHandle == NULL || fHandle->mgmtInfo == NULL){
+        return RC_FILE_HANDLE_NOT_INIT;
+    }
+    if(fHandle->curPagePos <1 || fHandle->curPagePos >= fHandle->totalNumPages){
+        return RC_READ_NON_EXISTING_PAGE;
+    }
+    return fHandle->curPagePos;
+}
