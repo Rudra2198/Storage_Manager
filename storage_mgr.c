@@ -127,3 +127,23 @@ extern int getBlockPos (SM_FileHandle *fHandle){
     }
     return fHandle->curPagePos;
 }
+
+//Reading the first Block of the file
+extern RC readFirstBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
+    //Idea: Call the readBlock() function by passing the first page's index i.e. 0
+    return readBlock(0, fHandle, memPage);
+}
+
+//Reading the Last Block of the File
+extern RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
+    int lastPage = fHandle->totalNumPages-1;
+    return readBlock(lastPage, fHandle, memPage);
+}
+
+extern RC readPreviousBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
+    int previousPage = fHandle->curPagePos - 1;
+    
+}
+
+
+
