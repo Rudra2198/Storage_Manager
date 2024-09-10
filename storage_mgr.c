@@ -12,6 +12,8 @@ extern void initStorageManager(void){
 
 /*********************** FILE OPERATIONS *********************/
 
+//WORK DONE BY SABARISH RAJA RAMESH RAJA (A20576363)
+
 //Creating a page file
 extern RC createPageFile (char *fileName){
     FILE *fileopen = fopen(fileName, "w"); //Opening the file to write
@@ -68,19 +70,21 @@ extern RC openPageFile (char *fileName, SM_FileHandle *fHandle){
 
 //CLOSING AN OPEN PAGE
 extern RC closePageFile (SM_FileHandle *fHandle){
-    FILE *closefile = (FILE *)fHandle ->mgmtInfo; //getting the file pointer from mgmtInfo
-    if(fclose(closefile) == 0){                   //Close the file in the condition itselg
+    FILE *closefile = (FILE *)fHandle ->mgmtInfo; // getting the file pointer from mgmtInfo
+    if(fclose(closefile) == 0){ // Close the file successfully
         return RC_OK;
     }
     else{
-        closefile = NULL;
+        return RC_FILE_NOT_CLOSED; // Return an appropriate error code
     }
 }
 
 //Destroying a page file
 extern RC destroyPageFile (char *fileName){
-    if(remove(fileName) == 0){
+    if(remove(fileName) == 0){ // If the file is removed successfully
         return RC_OK;
+    } else {
+        return RC_FILE_NOT_FOUND; // Return an error if the file could not be removed
     }
 }
 
@@ -140,10 +144,166 @@ extern RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
     return readBlock(lastPage, fHandle, memPage);
 }
 
+//Reading the previous block from the current block 
 extern RC readPreviousBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
     int previousPage = fHandle->curPagePos - 1;
-    
+    //Check if the page number is not below 0
+    if(previousPage <= 0){
+        return RC_READ_NON_EXISTING_PAGE;
+    }
+    return readBlock(previousPage, fHandle, memPage);
 }
 
+//Reading the current block from file
+extern RC readCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
+    int currentPage = fHandle->curPagePos;
+    return readBlock(currentPage, fHandle, memPage);
+}
 
+//Reading the Next Block from file
+extern RC readNextBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
+    int nextPage = fHandle->curPagePos + 1;
+    //The next block fo file should not be more than total number of pages
+    if(nextPage>=fHandle->totalNumPages){
+        return RC_READ_NON_EXISTING_PAGE;
+    }
+    return readBlock(nextPage, fHandle, memPage);
+}
+
+/*********************** WRITE OPERATIONS *********************/
+
+// WORK BY RUDRA PATEL 
+
+extern RC writeBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
+    // Check if the page number is valid
+    if (pageNum < 0 || pageNum >= fHandle->totalNumPages) {
+        return RC_WRITE_FAILED;
+    }
+
+    // Create a file pointer using the information in fHandle
+    FILE *file = (FILE *) fHandle->mgmtInfo;
+
+    // Move the pointer to the correct page location
+    long offset = pageNum * PAGE_SIZE;
+    if (fseek(file, offset, SEEK_SET) != 0) {
+        return RC_WRITE_FAILED;
+    }
+
+    // Write the block of memory to the file
+    size_t write_size = fwrite(memPage, sizeof(char), PAGE_SIZE, file);
+    if (write_size < PAGE_SIZE) {
+        return RC_WRITE_FAILED;
+    }
+
+    // Update the current page position in the file handle
+    fHandle->curPagePos = pageNum;
+
+    return RC_OK;
+}
+
+extern RC writeCurrentBlock(SM_FileHandle *fHandle, SM_PageHandle memPage) {
+    // Ensure that the current page position is valid
+    if (fHandle->curPagePos < 0 || fHandle->curPagePos >= fHandle->totalNumPages) {
+        return RC_WRITE_FAILED;
+    }
+
+    // Use writeBlock to write to the current page
+    return writeBlock(fHandle->curPagePos, fHandle, memPage);
+}
+
+extern RC appendEmptyBlock(SM_FileHandle *fHandle) {
+    // Allocate memory for an empty page and set it to 0
+    SM_PageHandle emptyPage = (SM_PageHandle) calloc(PAGE_SIZE, sizeof(char));
+    if (emptyPage == NULL) {
+        return RC_WRITE_FAILED;  // Memory allocation failed
+    }
+
+    // Retrieve the file pointer from the file handle (stored in mgmtInfo)
+    FILE *file = (FILE *) fHandle->mgmtInfo;
+
+    // Move the file pointer to the end of the file
+    if (fseek(file, 0L, SEEK_END) != 0) {
+        free(emptyPage);
+        return RC_FILE_NOT_FOUND;  // File seek error
+    }
+
+    // Write the empty page (filled with zero bytes) to the file
+    size_t write_code = fwrite(emptyPage, sizeof(char), PAGE_SIZE, file);
+    if (write_code != PAGE_SIZE) {
+        free(emptyPage);
+        return RC_WRITE_FAILED;  // Error in writing to the file
+    }
+
+    // Update the file handle's total number of pages
+    fHandle->totalNumPages++;
+
+    // Free the allocated memory for the empty page
+    free(emptyPage);
+
+    // Return success
+    return RC_OK;
+}
+
+/**********Verifying if the code works by executing all the functions ************/
+int main() {
+    // Initialize storage manager
+    initStorageManager();
+
+    // Declare the file handle and page handle (memory for the page)
+    SM_FileHandle fHandle;
+    SM_PageHandle memPage = (SM_PageHandle) malloc(PAGE_SIZE);
+
+    // Step 1: Create a new page file
+    char *fileName = "test_pagefile.bin";
+    RC rc = createPageFile(fileName);
+    if (rc != RC_OK) {
+        printf("Failed to create the page file. Error: %d\n", rc);
+        return rc;
+    }
+    printf("Page file created successfully!\n");
+
+    // Step 2: Open the created page file
+    rc = openPageFile(fileName, &fHandle);
+    if (rc != RC_OK) {
+        printf("Failed to open the page file. Error: %d\n", rc);
+        return rc;
+    }
+    printf("Page file opened successfully!\n");
+
+    // Step 3: Write data to the first (current) block
+    strcpy(memPage, "This is a test string for the first block.");
+    rc = writeCurrentBlock(&fHandle, memPage);
+    if (rc != RC_OK) {
+        printf("Failed to write to the current block. Error: %d\n", rc);
+        return rc;
+    }
+    printf("Data written to the current block successfully!\n");
+
+    // Step 4: Read data back from the first block to verify
+    memset(memPage, 0, PAGE_SIZE);  // Clear the memory page
+    rc = readFirstBlock(&fHandle, memPage);
+    if (rc != RC_OK) {
+        printf("Failed to read the first block. Error: %d\n", rc);
+        return rc;
+    }
+    printf("Data read from the first block: %s\n", memPage);
+
+    // Step 5: Close the file
+    rc = closePageFile(&fHandle);
+    if (rc != RC_OK) {
+        printf("Failed to close the page file. Error: %d\n", rc);
+        return rc;
+    }
+    printf("Page file closed successfully!\n");
+
+    // Step 6: Clean up by destroying the file
+    rc = destroyPageFile(fileName);
+    if (rc != RC_OK) {
+        printf("Failed to destroy the page file. Error: %d\n", rc);
+        return rc;
+    }
+    printf("Page file destroyed successfully!\n");
+
+    // Free allocated memory for the page
+}
 
